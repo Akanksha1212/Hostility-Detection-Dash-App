@@ -95,7 +95,7 @@ def generate_explainer_html(submit_n_clicks, reset_n_clicks, case, n_samples, te
     else:
         # Tokenize text using spaCy
         
-        exp = explainer(
+        exp = explainer(case,
                         text=text,
                         )
         obj = html.Iframe(

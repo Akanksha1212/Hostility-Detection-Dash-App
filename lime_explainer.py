@@ -11,103 +11,69 @@ import spacy
 from sklearn.pipeline import make_pipeline
 
 METHODS = {
-    'textblob': {
-        'class': "TextBlobExplainer",
-        'file': None,
-        'name': "TextBlob",
-        'lowercase': False,
-    },
-    'vader': {
-        'class': "VaderExplainer",
-        'file': None,
-        'name': "VADER",
-        'lowercase': False,
-    },
+    
     'logistic': {
-        'class': "LogisticExplainer",
-        'file': "models/merged_data.csv",
         'name': "Logistic Regression",
-        'lowercase': False,
     },
     'svm': {
-        'class': "SVMExplainer",
-        'file': "models/merged_data.csv",
         'name': "Support Vector Machine",
-        'lowercase': False,
     },
-    'fasttext': {
-        'class': "FastTextExplainer",
-        'file': "models/fasttext/multinomialClassifier1.pkl",
+    'multinomial': {
         'name': "Multinomial",
-        'lowercase': False,
+    },
+    'logisticTFIDF': {
+        'name': "Logistic Regression TF-IDF",
+    },
+    'svmTFIDF': {
+        'name': "Support Vector Machine TF-IDF",
+    },
+    'multinomialTFIDF': {
+        'name': "Multinomial TF-IDF",
     },
 }
 
 
-def tokenizer(s):
-    return s.split(' ') or s.split('  ')
-# def tokenizer(text: str) -> str:
-#     "Tokenize input string using a spaCy pipeline"
-#     nlp = spacy.blank('hi')
-#     nlp.add_pipe('sentencizer')  # Very basic NLP pipeline in spaCy
-#     doc = nlp(text)
-#     tokenized_text = ' '.join(token.text for token in doc)
-#     print(tokenized_text)
-#     return tokenized_text
+def tokenizer(text:str)->str:
+    return text.split(' ') or text.split('  ')
 
 
-# def explainer_class(method: str, filename: str) -> Any:
+# def explainer_class(method: str):
 #     "Instantiate class using its string name"
 #     classname = METHODS[method]['class']
-#     class_ = globals()[classname]
-    
-#     return class_(filename)
+#     # class_ = globals()[classname]
+#     print(classname)
+#     return classname
 
 
 
-# class LogisticExplainer:
-#     """Class to explain classification results of a scikit-learn
-#        Logistic Regression Pipeline. The model is trained within this class.
-#     """
-#     def __init__(self, path_to_train_data: str) -> None:
-#         # "Input training data path for training Logistic Regression classifier"
-#         import pandas as pd
-#         # Read in training data set
-#         self.train_df = pd.read_csv(path_to_train_data, header=0, index_col=0)
-#         print(self.train_df['Filtered_Post_Stopword_Removed'])
 
-#     def train(self) -> sklearn.pipeline.Pipeline:
-#         # "Create sklearn logistic regression model pipeline"
-#         from sklearn.feature_extraction.text import CountVectorizer
-#         from sklearn.pipeline import Pipeline
-#         from sklearn.naive_bayes import MultinomialNB
-#         import pickle
+def multinomialModel():
+    from sklearn.naive_bayes import MultinomialNB
+    model = MultinomialNB(alpha=0.8)
+    return model
 
-#         # classifier=pickle.load(open('models/fasttext/multinomialClassifier1.pkl', 'rb'))
-#         pipeline = Pipeline(
-#             [
-#                 ('vect', CountVectorizer()),
-#                 ('clf', self.MultinomialNB(alpha=0.8)),
-#             ]
-#         )
-#         # Train model
-#         classifier = pipeline.fit(self.train_df['Filtered_Post_Stopword_Removed'], self.train_df['Hostile/Non-Hostile'])
-#         return classifier
+def svmModel():
+    from sklearn import svm
+    from sklearn.svm import SVC
+    model = svm.SVC(kernel='rbf',probability=True)
+    return model
 
-#     def predict(self, texts: List[str]) -> np.array([float, ...]):
-#         """Generate an array of predicted scores (probabilities) from sklearn
-#         Logistic Regression Pipeline."""
-#         classifier = self.train()
-#         probs = classifier.predict_proba(texts)
-#         return probs
+def logisticModel():
+    from sklearn.linear_model import LogisticRegression
+    model = LogisticRegression(solver= 'newton-cg', penalty= 'l2', C = 0.5)
+    return model
 
-def explainer(text: str) -> LimeTextExplainer:
+
+
+
+def explainer(method: str,text: str) -> LimeTextExplainer:
     """Run LIME explainer on provided classifier"""
     from sklearn.naive_bayes import MultinomialNB
     from lime.lime_text import LimeTextExplainer
     from lime.lime_text import TextDomainMapper
     from lime.lime_tabular import LimeTabularExplainer
     from sklearn.feature_extraction.text import CountVectorizer
+    from sklearn.feature_extraction.text import TfidfVectorizer
     merged_data = pd.read_csv('models/merged_data.csv', header=0, index_col=0)
     
     hindi_stopwords = pd.read_csv('models/hindi_stopwords.csv', header=None)[0].tolist()
@@ -115,20 +81,49 @@ def explainer(text: str) -> LimeTextExplainer:
     hindi_stopwords.extend(stop_words)
     train_y = merged_data['Hostile/Non-Hostile']
     vectorizer = CountVectorizer(encoding='ISCII',tokenizer=tokenizer, stop_words=hindi_stopwords).fit(merged_data['Filtered_Post_Stopword_Removed'])
-
+    vectorizer1 = TfidfVectorizer(encoding='ISCII',tokenizer=tokenizer, stop_words=hindi_stopwords).fit(merged_data['Filtered_Post_Stopword_Removed'])
     merged_X_train_vectorized = vectorizer.transform(merged_data['Filtered_Post_Stopword_Removed'].tolist())
-
-    model = MultinomialNB(alpha=0.8)
-    model.fit(merged_X_train_vectorized, merged_data['Hostile/Non-Hostile'].values)
+    merged_X_train_tfidf = vectorizer1.transform(merged_data['Filtered_Post_Stopword_Removed'].tolist())
+    class_names = ['Non-Hostile', 'Hostile']
+    
+    a=method
+    print(a)
+    if a=="multinomial":
+        model = multinomialModel()
+        train_x=merged_X_train_vectorized
+        vectori=vectorizer
+    if a=="svm":
+        model = svmModel()
+        train_x=merged_X_train_vectorized
+        vectori=vectorizer
+    if a=="logistic":
+        model = logisticModel()
+        train_x=merged_X_train_vectorized
+        vectori=vectorizer
+    # model.fit(, merged_data['Hostile/Non-Hostile'].values)
     # predictor = model.predict
+    if a=="multinomialTFIDF":
+        model = multinomialModel()
+        train_x=merged_X_train_vectorized
+        vectori=vectorizer1
+    if a=="svmTFIDF":
+        model = svmModel()
+        train_x=merged_X_train_vectorized
+        vectori=vectorizer1
+    if a=="logisticTFIDF":
+        model = logisticModel()
+        train_x=merged_X_train_vectorized
+        vectori=vectorizer1
+
+    model.fit(train_x, merged_data['Hostile/Non-Hostile'].values)
     
 
-    class_names = ['Non-Hostile', 'Hostile']
+    
 
     
     explainer = LimeTextExplainer(class_names=class_names, split_expression= tokenizer)
 
-    c = make_pipeline(vectorizer, model)
+    c = make_pipeline(vectori, model)
     # Make a prediction and explain it:
     exp = explainer.explain_instance(text, c.predict_proba, num_features=50)
 
